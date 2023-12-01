@@ -1,0 +1,6 @@
+langchain
+openai
+setuptools
+python-dotenv
+argparse
+playwright

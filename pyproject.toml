@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pywebagent"
+version = "0.1"
+authors = [
+    { name="Ori Kabeli", email="ori.kabeli@gmail.com" },
+    { name="Maxim Kogan", email="maximkgn@gmail.com" }
+]
+description = "An experimental AI web agent"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+
+dependencies = [
+    "langchain",
+    "openai",
+    "setuptools",
+    "python-dotenv",
+    "argparse",
+    "playwright"
+]
+
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3.10"
+]
+
+keywords = ["Web agent", "Web automation", "Web testing", "Web action agent"]
+
+[project.urls]
+"Homepage" = "https://github.com/pywebagent/pywebagent"
+
+[tool.setuptools]
+packages = { find = { where = ["src"] } }
+zip-safe = false
+
+[tool.setuptools.package-data]
+pywebagent = ["js/*.js"]
