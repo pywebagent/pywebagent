@@ -46,6 +46,10 @@ act(
     password="<your amazon password>"
 )
 ```
+Sped up recording:
+
+https://github.com/pywebagent/pywebagent/assets/3140740/adf62554-e8ba-436b-9bbc-34ee6924198b
+
 
 
 ### Example 2: Order your photo prints from Mixtiles
@@ -72,6 +76,11 @@ act(
     address="123 Main St, San Francisco, CA 94105"
 )
 ```
+
+Sped up recording:
+
+https://github.com/pywebagent/pywebagent/assets/3140740/3af0092c-cc4b-40ca-9241-f8b5a4863b60
+
 
 ## 🛠️ How It Works
 The concept is extremely simple. Detect all elements that have an event handler (which means they can be interacted with), highlight them, take a screenshot, and ask GPT 4 Vision what to do. The results are surprisingly good!
