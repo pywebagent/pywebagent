@@ -14,6 +14,7 @@
 * It basically converts website capabilities to python functions!
 * With `pywebagent`, you can automate complex tasks on websites, like filling forms, buying products, and more.  
 * It is especially useful for performing tasks that require multiple steps, such as buying a product online, booking a flight, etc.
+* It is really, really, really experimental (definitely lots of hacky code 😅)
 
 ## 🌟 Highlights
 
