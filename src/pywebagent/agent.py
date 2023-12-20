@@ -26,13 +26,17 @@ def get_llm():
     )
 
 def generate_user_message(task, observation):
-    log_history = '\n'.join(observation.log_history if observation.log_history else [])
+    log_history = '\n'.join(observation.env_state.log_history if observation.env_state.log_history else [])
+    marked_elements_tags = ', '.join([f"({str(i)}) - {elem['tag']}" for i, elem in observation.marked_elements.items()])
     text_prompt = f"""
         Execution error: 
         {observation.error_message}
 
         URL: 
         {observation.url}
+
+        Marked elements tags:
+        {marked_elements_tags}
         
         Task: 
         {task.task}
@@ -67,10 +71,12 @@ def generate_system_message():
     - actions.click(element_id, log_message) # click on an element
     - actions.input_text(element_id, text, clear_before_input, log_message) # Use clear_before_input=True to replace the text instead of appending to it. Never use this method on a combobox.
     - actions.upload_files(element_id, files: list, log_message) # use this instead of click if clicking is expected to open a file picker
+    - actions.scroll(direction, log_message) # scroll the page up or down. direction is either 'up' or 'down'.
     - actions.combobox_select(element_id, option, log_message) # select an option from a combobox.
-    - actions.finish(did_succeed, reason) # the task is complete with did_succeed=True or False, and a text reason
-
-    element_id is always an integer, and is visible as a green label with white number inside the top-left corner of the element. Make sure to examine all green highlighted elements before choosing one to interact with.
+    - actions.finish(did_succeed, output: dict, reason) # the task is complete with did_succeed=True or False, and a text reason. output is optional dictionary of output values if the task succeeded.
+    - actions.act(url: str, task: str, log_message, **kwargs) # run another agent on a different webpage. The sub-agent will run until it finishes and will output a result which you can use later. Useful for getting auth details from email for example.
+                                                              # task argument should be described in natural language. kwargs are additional arguments the sub-agent needs to complete the task. YOU MUST PROVIDE ALL NEEDED ARGUMENTS, OTHERWISE THE SUB-AGENT WILL FAIL.
+    element_id is always an integer, and is visible as a green label with white number around the TOP-LEFT CORNER OF EACH ELEMENT. Make sure to examine all green highlighted elements before choosing one to interact with.
     log_message is a short one sentence explanation of what the action does.
     Do not use keyword arguments, all arguments are positional.
 
@@ -126,11 +132,11 @@ def calcualte_next_action(task, observation):
     code_to_execute = extract_code(ai_message.content)
 
     return code_to_execute
-    
+     
 def get_task_status(observation):
-    if observation.has_successfully_completed:
+    if observation.env_state.has_successfully_completed:
         return TASK_STATUS.SUCCESS
-    elif observation.has_failed:
+    elif observation.env_state.has_failed:
         return TASK_STATUS.FAILED
     else:
         return TASK_STATUS.IN_PROGRESS
@@ -139,16 +145,15 @@ def act(url, task, max_actions=40, **kwargs):
     task = Task(task=task, args=kwargs)
 
     browser = BrowserEnv(headless=False)
-
-    observation = browser.reset(url)
+    observation = browser.reset(url) 
 
     for i in range(max_actions):
         action = calcualte_next_action(task, observation) 
         observation = browser.step(action, observation.marked_elements)
         task_status = get_task_status(observation)
         if task_status in [TASK_STATUS.SUCCESS, TASK_STATUS.FAILED]:
-            return task_status
+            return task_status, observation.env_state.output
     
     logger.warning(f"Reached {i} actions without completing the task.")
-    return TASK_STATUS.FAILED
+    return TASK_STATUS.FAILED, observation.env_state.output
 

@@ -132,3 +132,4 @@ langchain.db
 tmp/
 .vscode/settings.json
 user_data*/
+.vscode/

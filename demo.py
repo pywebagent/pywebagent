@@ -29,10 +29,18 @@ def main(demo):
             email="<your email>",
             password="<your password>",
         )
+    elif demo == "ubereats":
+        act(
+            "https://ubereats.com/",
+            "Order a pizza",
+            email="<your email>",
+            email_password="<your password>",
+            address= "<your address>",
+            # optional: delivery_date="...",
+            # optional: delivery_time="...",
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--demo", required=True, choices=["mixtiles", "amazon"])
+    parser.add_argument("--demo", required=True, choices=["mixtiles", "amazon", "ubereats"])
     args = parser.parse_args()
-    main(args.demo)
-
