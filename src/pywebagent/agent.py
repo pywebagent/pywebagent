@@ -27,7 +27,7 @@ def get_llm():
 
 def generate_user_message(task, observation):
     log_history = '\n'.join(observation.env_state.log_history if observation.env_state.log_history else [])
-    marked_elements_tags = ', '.join([f"({str(i)}) - {elem['tag']}" for i, elem in observation.marked_elements.items()])
+    marked_elements_tags = ', '.join([f"({str(i)}) - <{elem['tag'].lower()}>" for i, elem in observation.marked_elements.items()])
     text_prompt = f"""
         Execution error: 
         {observation.error_message}
