@@ -1,4 +1,20 @@
 (function() {
+    function getAdjustedBoundingClientRect(element) {
+        const rect = element.getBoundingClientRect();
+        return {
+            top: rect.top + window.scrollY,
+            left: rect.left + window.scrollX,
+            bottom: rect.bottom + window.scrollY,
+            right: rect.right + window.scrollX,
+            width: rect.width,
+            height: rect.height
+        };
+    }
+
+    function getAdjustedElementFromPoint(x, y) {
+        return document.elementFromPoint(x - window.scrollX, y - window.scrollY);
+    }
+
     function getXPathForElement(element) {
         // Check if the element is the body, if so, return the XPath for body
         if (element.tagName === 'BODY') {
@@ -41,7 +57,7 @@
 
   function createLabel(rect, id) {
       const label = document.createElement('div');
-      let labelLeft = rect.left - 12; // Your original calculation
+      let labelLeft = rect.left - 16; // Your original calculation
       if (labelLeft < 0) {
           labelLeft = 0;
       }
@@ -81,22 +97,22 @@
 
   // Checks if rects of one element is contained in another element
   function isRectContainedInElement(element, element2) {
-    const rect = element.getBoundingClientRect();
-    const rect2 = element2.getBoundingClientRect();
+    const rect = getAdjustedBoundingClientRect(element);
+    const rect2 = getAdjustedBoundingClientRect(element2);
     const intersectionRect = getIntersectionRect(rect, rect2);
     return (intersectionRect.width >= 0.9 * rect2.width 
         && intersectionRect.height >= 0.9 * rect2.height);
   }
 
   function isPrioritisedElement(elem) {
-    return ['INPUT', 'SELECT', 'A', 'BUTTON', 'TEXTAREA'].includes(elem.tagName) || elem.onclick;
+    return ['INPUT', 'SELECT', 'A', 'BUTTON', 'TEXTAREA'].includes(elem.tagName) || (elem.onclick !== null);
   }
 
   function createBorder(element, id) {
-      let rect = element.getBoundingClientRect();
-      const topElement = document.elementFromPoint(rect.left, rect.top);
+      let rect = getAdjustedBoundingClientRect(element);
+      const topElement = getAdjustedElementFromPoint(rect.left, rect.top);
       if (topElement) {
-        const rect2 = topElement.getBoundingClientRect();
+        const rect2 = getAdjustedBoundingClientRect(topElement);
         const intersectionRect = getIntersectionRect(rect, rect2);
         // If intersection exists, use it
         if (intersectionRect.width > 1 && intersectionRect.height > 1) {
@@ -128,14 +144,14 @@
                element.getClientRects().length === 0);
   }
 
-  function isElementAccessible(element) {
-    const rect = element.getBoundingClientRect();
+  function isElementMouseAccessible(element) {
+    const rect = getAdjustedBoundingClientRect(element);
     if (rect.width < 2 || rect.height < 2) {
       return false;
     }
 
     function AccessibleFromLoc(element, x, y) {
-        const topElement = document.elementFromPoint(x, y);
+        const topElement = getAdjustedElementFromPoint(x, y);
         if (topElement === null) {
             // console.log('topElement is null');
             return false;
@@ -155,68 +171,81 @@
         || AccessibleFromLoc(element, rect.right, rect.bottom) 
         || AccessibleFromLoc(element, rect.left + rect.width / 2, rect.top + rect.height / 2);
   }
+  
+  function isElementInViewport(element) {
+    const rect = getAdjustedBoundingClientRect(element);
+    return (rect.bottom < document.documentElement.clientHeight + window.scrollY 
+        && rect.right < document.documentElement.clientWidth + window.scrollX 
+        && rect.top >= window.scrollY 
+        && rect.left >= window.scrollX);
+  }
 
-  const markedElements = [];
-  const allElements = document.querySelectorAll('body *');
+  function isElementInteractable(element) {
+    const rect = getAdjustedBoundingClientRect(element);
+    cursor = window.getComputedStyle(element).cursor;
 
-  allElements.forEach(element => {
-    // Skip if this element is a child of an already marked element (unless it is a prioritised element (button, select etc.)))
-    // Skip also elements of already intersecting elements
-    remove_containing_element = false;
+    const centerX = rect.left;
+    const centerY = rect.top;
+    const topElement = getAdjustedElementFromPoint(centerX, centerY);
+    cursor_from_point = 'n/a'
+    if (topElement) {
+        cursor_from_point =  window.getComputedStyle(topElement).cursor;
+    }
+
+    return (['pointer', 'hand', 'text'].includes(cursor) 
+        && ['pointer', 'auto', 'hand', 'text'].includes(cursor_from_point));
+  }
+
+
+  function isMarkableElement(element) {
+    return (isElementInViewport(element) && isElementVisible(element) && isElementMouseAccessible(element) && isElementInteractable(element));
+  }
+
+  function findRelatedMarkedElement(element, markedElements) {
     containing_element_index = markedElements.findIndex(e => e.contains(element));
     intersecting_element_index = markedElements.findIndex(e => isRectContainedInElement(e, element));
+    element_index = markedElements.length;
 
-    if (containing_element_index !== -1 || intersecting_element_index !== -1) {
-        if (containing_element_index !== -1) {
-            containing_element = markedElements[containing_element_index];
-            if ((isPrioritisedElement(element)) && !isPrioritisedElement(containing_element)) {
-                remove_containing_element = true;
-                console.log("removing element by dom tree hirarchy", containing_element, "because of element", element);
-            } else {
-                return;
-            }
-        } else if (intersecting_element_index !== -1) {
-            intersecting_element = markedElements[intersecting_element_index];
-
-            if ((isPrioritisedElement(element)) && !isPrioritisedElement(intersecting_element)) {
-                remove_containing_element = true;
-                console.log("removing element by intersection", intersecting_element, "because of element", element);
-            } else {
-                return;
-            }
+    if (containing_element_index !== -1) {
+        containing_element = markedElements[containing_element_index];
+        if ((isPrioritisedElement(element)) && !isPrioritisedElement(containing_element)) {
+            console.log("removing element by dom tree hirarchy", containing_element, "because of element", element);
+            return containing_element_index;
+        } else {
+            return element_index;
+        }
+    } else if (intersecting_element_index !== -1) {
+        intersecting_element = markedElements[intersecting_element_index];
+        if ((isPrioritisedElement(element)) && !isPrioritisedElement(intersecting_element)) {
+            console.log("removing element by intersection", intersecting_element, "because of element", element);
+            return intersecting_element_index;
+        } else {
+            return element_index;
         }
     }
 
-      const rect = element.getBoundingClientRect();
-      if (rect.width < document.documentElement.clientWidth && rect.height < document.documentElement.clientHeight) {
+    return -1;
+  }
 
-        cursor = window.getComputedStyle(element).cursor;
+  // Main code - mark elements that can be interacted
+  const markedElements = [];
+  const allElements = document.querySelectorAll('body *');
+  allElements.forEach(element => {
+    if (isMarkableElement(element)) {
+        remove_elem_index = findRelatedMarkedElement(element, markedElements);
 
-        const centerX = rect.left;
-        const centerY = rect.top;
-        const topElement = document.elementFromPoint(centerX, centerY);
-        cursor_from_point = 'n/a'
-        if (topElement) {
-            cursor_from_point =  window.getComputedStyle(topElement).cursor;
+        markedElements.push(element);
+        // Remove element because of containing / intersecting element that's already marked
+        if (remove_elem_index !== -1) {
+            markedElements.splice(remove_elem_index, 1);
         }
 
-        if (['pointer', 'hand', 'text'].includes(cursor) && ['pointer', 'auto', 'hand', 'text'].includes(cursor_from_point)) {
-
-              if (isElementVisible(element) && isElementAccessible(element)) {
-                if (remove_containing_element) {
-                    markedElements.splice(containing_element_index, 1);
-                }
-
-                markedElements.push(element);
-            }
-      }
     }
-
   });
 
-  // createBorder(element, counter) for all elements
+  // Mark the elements
   markedElementsMetadata = [];
-  let counter = 0;  // Changed from outside the script at browser.py
+  let counter = 0;  // NOTE: changed from outside the script at browser.py
   for (let i = 0; i < markedElements.length; i++) {
     const element = markedElements[i];
     let originalLabel = element.getAttribute('aria-label');

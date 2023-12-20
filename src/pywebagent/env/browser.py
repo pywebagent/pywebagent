@@ -6,22 +6,20 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Tuple, Dict
 from playwright.sync_api import sync_playwright
-from pywebagent.env.actions import Actions
+from pywebagent.env.actions import Actions, EnvState
 
 logger = logging.getLogger(__name__)
 
 JS_DIRECTORY = Path(os.path.dirname(os.path.realpath(__file__))) / "../js"
+
 
 @dataclass
 class WebpageObservation:
     url: str
     error_message: str
     screenshot: bytes
-    has_successfully_completed: bool
-    has_failed: bool
-    timeframe: int
     marked_elements: Dict[str, Any]
-    log_history: list[str] = None
+    env_state: EnvState = None
 
 
 class BrowserEnv:
@@ -42,7 +40,8 @@ class BrowserEnv:
             self.override_file_chooser_js_script = file.read()
         
     def step(self, code: str, marked_elements: list = []) -> WebpageObservation:
-        actions = Actions(self.page, marked_elements)
+        self.env_state.log_history = []  # Clear log history to have logs only for the current step
+        actions = Actions(self.page, marked_elements, self.env_state)
         context = {"actions": actions}
         try:
             error_message = None
@@ -65,19 +64,26 @@ class BrowserEnv:
         finally:
             self._remove_elements_marks()
 
-
         try:
             self.page.wait_for_load_state("networkidle", timeout=5000)
         except Exception as e:
             logger.warning(f"Exception while waiting for load state: {e}")
 
-        self.has_successfully_completed = actions.has_successfully_completed
-        self.has_failed = actions.has_failed
-        self.timeframe += 1
+        self.env_state.timeframe += 1
         time.sleep(2)
         obs = self.get_observation()
+
+        # if a new page was opened, switch to it
+        if len(self.context.pages) > 1:
+            self.page.close()
+            self.page = self.context.pages[-1]
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception as e:
+                logger.warning(f"Exception while waiting for load state: {e}")
+            obs = self.get_observation()
+
         obs.error_message = error_message
-        obs.log_history = actions.log_history
         return obs
     
     def _mark_elements(self):
@@ -128,10 +134,8 @@ class BrowserEnv:
             url=self.page.url,
             error_message=None,
             screenshot=screenshot,
-            has_successfully_completed=self.has_successfully_completed,
-            has_failed=self.has_failed,
-            timeframe=self.timeframe,
             marked_elements=marked_elements,
+            env_state = self.env_state,
         )
         
     def reset(self, url) -> Tuple[WebpageObservation, Dict[str, Any]]:
@@ -157,9 +161,7 @@ class BrowserEnv:
             # try to wait for "load" state, sometimes the page is stuck with network traffic loading
             self.page.wait_for_load_state("load")
         logger.info("Page loaded")
-        self.timeframe = 0
-        self.has_failed = False
-        self.has_successfully_completed = False
+        self.env_state = EnvState()
         return self.get_observation()
 
     def close(self):

@@ -1,22 +1,60 @@
 import time
 import logging
+from attr import dataclass
 import playwright
+import subprocess
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class EnvState:
+    has_successfully_completed: bool = False
+    has_failed: bool = False
+    output: dict = {}
+    timeframe: int = 0
+    log_history: list[str] = []
+
 
 class Actions:
-    def __init__(self, page, marked_elements: list) -> None:
-        self.log_history = []
-        self.has_successfully_completed = False
-        self.has_failed = False
+    def __init__(self, page, marked_elements: list, env_state: EnvState) -> None:
+        self.env_state = env_state
         self.page = page
         self.marked_elements = marked_elements
 
-    def finish(self, success, reason: str) -> None:
-        self.has_successfully_completed = success
-        self.has_failed = not success
-    
+    def finish(self, success, output: dict, reason: str) -> None:
+        self.env_state.has_successfully_completed = success
+        self.env_state.has_failed = not success
+        self.env_state.output = output
+
+    def act(self, url, task, log_message, **kwargs) -> None:
+        # if url is not valid
+        if not url.startswith("https://"):
+            raise Exception("URL must start with https://")
+        
+        # get the domain from url so https://www.google.com becomes google.com for example
+        domain = url.split("://")[1].split("/")[0]
+        existing_domain = self.page.url.split("://")[1].split("/")[0]
+        if domain == existing_domain:
+            raise Exception("Sub agent cannot act on the same domain as this agent, complete the task thrugh other actions instead")
+
+        if log_message:
+            self.env_state.log_history.append(log_message)
+        process = subprocess.Popen(["python", "run.py", "--url", url, "--task", task, "--kwargs", str(kwargs)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            raise Exception("Error running ai agent:", stderr)
+        stdout = stdout.split("\n")
+        status = stdout[-3][len("Status: "):]
+        assert status == "TASK_STATUS.SUCCESS", f"AI agent failed with status {status}"
+        output = stdout[-2][len("Output: "):]
+        try:
+            output = eval(output)
+        except Exception as e:
+            raise Exception("Failed to parse output as JSON from AI agent:", stdout, e)
+
+        self.env_state.log_history.append(f"Sub agent finished successfully with output: {output}")
+        return output
+        
     def set_page(self, page):
         self.page = page
 
@@ -54,7 +92,7 @@ class Actions:
         If the element is not clickable and `force` is False, retries with force click.
         """
         if log_message:
-            self.log_history.append(log_message)
+            self.env_state.log_history.append(log_message)
         try:
             inner_exception_raised = False
             with self.page.expect_file_chooser(timeout=1200):
@@ -79,19 +117,32 @@ class Actions:
 
         raise Exception("filechooser event was triggered unexpectedly. Consider using upload_files() instead of click() for this element.")
 
+    def scroll(self, direction: str, log_message: str) -> None:
+        self.env_state.log_history.append(log_message)
+        if direction not in ["up", "down"]:
+            raise Exception("direction must be either 'up' or 'down'")
+        
+        # Scroll by the height of the viewport for page down/up
+        scroll_height = "window.innerHeight"  # Gets the height of the viewport
+
+        if direction == "up":
+            self.page.evaluate(f"window.scrollBy(0, -{scroll_height})")
+        else:
+            self.page.evaluate(f"window.scrollBy(0, {scroll_height})")
+
     def combobox_select(self, item_id: int, option: str, log_message: str) -> None:
-        self.log_history.append(log_message)
+        self.env_state.log_history.append(log_message)
         self._visualized_interact(item_id, "select_option", option)
 
     def input_text(self, item_id: int, text: str, clear_before_input: bool, log_message: str):
-        self.log_history.append(log_message)
+        self.env_state.log_history.append(log_message)
         if clear_before_input:
             self._visualized_interact(item_id, "fill", text)
         else:
             self._visualized_interact(item_id, "type", text)
 
     def upload_files(self, item_id: int, files: list, log_message: str) -> None:
-        self.log_history.append(log_message)
+        self.env_state.log_history.append(log_message)
         try: 
             with self.page.expect_file_chooser(timeout=2000) as file_chooser_info:
                 successfully_clicked = False
