@@ -1,6 +1,6 @@
 # pywebagent - an experimental AI web agent
 ![pywebagent](logo.png "Logo")  
-[![Discord Follow](https://dcbadge.vercel.app/api/server/f3CTRyCtCW?style=for-the-badge)](https://discord.gg/f3CTRyCtCW)
+[![Discord Follow](https://dcbadge.vercel.app/api/server/p5GxJMYHPT?style=for-the-badge)](https://discord.gg/p5GxJMYHPT)
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/pywebagent/pywebagent?style=social)](https://github.com/pywebagent/pywebagent)
 [![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/kogan_maxim)](https://twitter.com/kogan_maxim)
