@@ -99,7 +99,7 @@ Contributions are more than welcome! In fact, we're looking for people who want 
 If you have any suggestions, features requests or want to report bugs, kindly open an issue first to discuss what you would like to change. For changes, please open a pull request.
 
 ## 🌐 Community
-Feel free to join our discord at https://discord.gg/5eJkjMMa. 
+Feel free to join our discord at https://discord.gg/p5GxJMYHPT. 
 
 ## 📜 License
 
